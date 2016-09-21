@@ -1,6 +1,8 @@
 
 The data from this report was collected from all 30 NBA teams over the course of the 2015-2016 season. The independent (predicting) variable is defensive rating, which according to the data source is “an estimate of points allowed per 100 possessions.”  That means that the lower the rating, the more effective the defense is. The dependent variables is the amount of wins the team had (out of 82 total games) in the season. The data is from a site called Basketball Reference, and can be accessed here: http://www.basketball-reference.com/leagues/NBA_2016_ratings.html. 
 
+If the tables / plots don't appear, try downloading the notebook and running it in R Studio.
+
 First, let's install our key packages.
 
 ```{r}
