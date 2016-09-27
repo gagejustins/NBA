@@ -147,6 +147,46 @@ Like above, the uppermost point has been removed so the graph shifts downward.
 Finally, let's remove the second outlier, the Philadelphia 76ers. To recall, they had an above average defensive rating, but the least wins in the league.
 
 ```{r}
+newdf2 <- filter(df, Team != "Philadelphia 76ers")
+```
+
+```{r}
+newplot2 <- ggplot(newdf2, aes(DRtg, W)) + geom_point()
+newplot2 <- newplot2 + ggtitle("Defensive Rating vs. Wins") + labs(x = "Defensive Rating", y = "Wins")
+newplot2 
+```
+
+```{r}
+newRegDef2 <- lm(data=newdf2, W ~ DRtg)
+summary(newRegDef2)
+```
+
+```{r}
+print(paste("The difference in R^2 from the original regression is: " , (summary(newRegDef2)$r.squared) - summary(regDef)$r.squared))
+
+print(paste("The difference in coefficient from the original regression is: " , (newRegDef2$coefficients[2]) - regDef$coefficients[2]))
+```
+
+```{r}
+newresplot2 <- ggplot(newdf2, aes(newRegDef2$fitted.values, newRegDef2$residuals)) + geom_point()
+newresplot2 <- newresplot2 + geom_hline(yintercept = 0, col = "red", linetype = "dashed")
+newresplot2 <- newresplot2 + ggtitle("Residuals") + labs(x = "Fitted Values", y = "Residuals")
+newresplot2
+```
+
+```{r}
+newreshist2 <- ggplot(newdf2, aes(newRegDef2$residuals)) + geom_histogram(fill = "blue")
+newreshist2 <- newreshist2 + ggtitle("Residuals") + labs(x = "Residuals", y = "Count")
+newreshist2
+```
+
+```{r}
+qqnorm(newRegDef2$residuals)
+```
+
+Removing both outliers.
+
+```{r}
 finaldf <- filter(newdf, Team != "Philadelphia 76ers")
 ```
 
