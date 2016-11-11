@@ -1,7 +1,0 @@
-
-First, load our data.
-
-```{r}
-
-```
-
