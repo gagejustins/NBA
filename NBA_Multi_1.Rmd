@@ -1,0 +1,262 @@
+
+First, we'll load the necessary packages. We'll use Dplyr to manipulate our dataframes, Ggplot2 to visualize our data, leaps to evaluate the Mallows Cp for our best subsets regression analysis, and AICcmodavg to evaluate the AICc.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(leaps)
+library(AICcmodavg)
+```
+
+People always talk about how exciting offense is (and look at social media for further proof), but traditionalists like me wonder about how the oft-underappreciated defense is made up. What defensive metrics drive a good defensive rating? We'll take a look at how steals, defensive rebounds, personal fouls, and blocks impact a team's allowed points per 100 possessions using a linear regression model. 
+
+We'll start by loading the data. I got this from two different charts on Basketball Reference. 
+
+```{r}
+df <- read.csv("teams.csv")
+str(df)
+```
+
+We can make histograms of each variable we're interested in to see the distributions. 
+
+```{r}
+par(mfrow=c(2,3))
+hist(df$DRtg, main="Defensive Rating", xlab="")
+hist(df$DRB, main="Defensive Rebounds", xlab="")
+hist(df$STL, main="Steals", xlab="")
+hist(df$BLK, main="Blocks", xlab="")
+hist(df$PF, main="Personal Fouls", xlab="")
+```
+
+These histograms are mostly normal. However: the Defensive Rating seems to have a left tail, Blocks isn't quite normal, and Personal Fouls takes a strange turn if you go past 1800. But none of these look to bad so we can leave 'em.
+
+We can make scatterplots of each variable versus defensive rating.
+
+```{r}
+par(mfrow=c(2,2))
+plot(df$DRB, df$DRtg, main="vs. Defensive Rebounds", xlab="Defensive Rebounds", ylab="Defensive Rating", ylim=c(95,115))
+plot(df$STL, df$DRtg, main="vs. Steals", xlab="Steals", ylab="Defensive Rating", ylim=c(95,115))
+plot(df$BLK, df$DRtg, main="vs. Blocks", xlab="Blocks", ylab="Defensive Rating", ylim=c(95,115))
+plot(df$PF, df$DRtg, main="vs. Personal Fouls", xlab="Personal Fouls", ylab="Defensive Rating", ylim=c(95,115))
+```
+
+There appears to be a relationship in all of the plots, to differing degress. Defensive Rebounds appear to have the strongest correlation, followed by Steals and Personal Fouls. The relationships with Blocks is unclear.
+
+In terms of outliers and leverage points, there look to be a few. For Defensive Rebounds, there seems to be a leverage point on the left side of the plot, which corresponds to the Memphis Grizzlies. Steals seems to have a leverage point all the way on the right of the plot, which represents the Houston Rockets. Finally, the Personal Foul plot has an outlier at the bottom left, the San Antonio Spurs.
+
+Let's run a regression and see the results.
+
+```{r}
+reg1 <- lm(data=df, DRtg ~ DRB + STL + BLK + PF)
+summary(reg1)
+```
+
+Ok! The R^2 (adjusted) is 52%, which is pretty good. The Residual Standard Error is 2.045, which means that we can predict the Defensive Rating to within 4.09 points per 100 posessions.
+
+The F statistic is significant at 8.977, with a P-Value of .0001. 
+
+To determine if we have an issue with collinearity, we can use VIF.
+
+```{r}
+library(car)
+```
+
+```{r}
+vif(reg1)
+```
+
+To evaluate whether these numbers pose an issue to our regression, we use the formula MAX(10, 1/(1-R^2)). In our case, 1/(1-R^2) evaluates to 2.1. The VIF (Variance Inflation Factors) all hover between 1 and 2, which means that multicollinearity isn't an issue in our regression. 
+
+The Y-intercept of 150 isn't particularly meaningful, as it describes a team without any Defensive Rebounds, Steals, Blocks, and Personal Fouls (a bad defense indeed).
+
+Analyzing the coefficients:
+
+1) Defensive Rebounds: the coefficient is -.0164, meaning that every defensive rebound that a team pulls in is associated with .0164 less points allowed per 100 possessions, holding all other variables fixed. In other words, every additional 60 rebounds is associated with one point less allowed per 100 possessions.
+
+2) Steals: the coefficient is -.0191, meaning that every team steal is associated with .0191 less points allowed per 100 possessions, holding all other variables fixed. This means that every 53 steals are associated with one point less allowed per 100 possessions.
+
+3) Blocks: the coefficient is -.0044, meaning that every team block is associated with .0044 less points allowed per 100 possessions, holding all other variables fixed. This means that every 227 blocks are associated with one point less allowed per 100 possessions.
+
+4) Personal Fouls: the coefficient is .0092, meaning that every personal foul is associated with .0092 more points allowed per 100 possessions, holding all other variables fixed (a positive correlation, unlike the other 3 variables). This means that every 109 personal fouls are associated with one more point allowed per 100 possessions.  
+
+Residual plots:
+
+First, standardize the residuals.
+
+```{r}
+res.stand <- rstandard(reg1)
+```
+
+Then plot them.
+
+```{r}
+par(mfrow=c(2,2))
+hist(res.stand, main="Standardized Residuals Histogram", xlab="Residuals", xlim=c(-3,3))
+qqnorm(res.stand)
+plot(reg1$fitted.values, res.stand, main="Standardized Residuals Scatterplot", xlab="Fitted Values", ylab="Residuals", cex=.5, ylim=c(-3,3))  + abline(a=0, b=0)
+```
+
+The scatterplot and histogram show that our assumptions are generally correct, and the residuals are normally distributed. The residuals scatterplot seems to have no pattern, which would indicate homoscedasticity. There also don't appear to be any outliers. The point all the way on the right may be a potential leverage point, and refers to the Los Angeles Lakers. They had the league's worst defense, allowing 112.4 points per 100 possesions (almost a full point higher than the second worst team, the Brooklyn Nets).
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(df$DRB, res.stand, main="Standardized Residuals vs. Defensive Rebounds", xlab="Defensive Rebounds", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+
+plot(df$STL, res.stand, main="Standardized Residuals vs. Steals", xlab="Steals", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+
+plot(df$BLK, res.stand, main="Standardized Residuals vs. Blocks", xlab="Blocks", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+
+plot(df$PF, res.stand, main="Standardized Residuals vs. Personal Fouls", xlab="Personal Fouls", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+```
+
+The plots of residuals vs. each of the individual predictors don't show any significant pattern either. As noted above, on the steals graph, there appears to be a leverage point all the way to the right, corresponding to the Houston Rockets, with a league leading 821 steals (70 more than the second best Boston Celtics). Another issue to look out for is possible left leverage points in Defensive Rebounds (Memphis Grizzlies) and in Personal Fouls (San Antonio Spurs).
+
+To take a look at the regression diagnostics, we'll create a dataframe with the team name, standardized residuals, leverage values, and Cook's distances.
+
+```{r}
+teams <- df$Team
+leverage_values <- hatvalues(reg1)
+cooks_distances <- cooks.distance(reg1)
+diagnostics <- data.frame(teams, res.stand, leverage_values, cooks_distances)
+
+#Define the max leverage value: 2.5 * (number of predicting variables + 1 / n) = .4166
+
+arranged <- arrange(diagnostics, desc(leverage_values))
+arranged
+```
+
+Now we'll work on choosing the best model. 
+
+Using Mallows CP:
+
+```{r}
+cp <- leaps(cbind(df$STL, df$BLK, df$PF, df$DRB), names=c("steals","blocks","fouls","d rebounds"), df$DRtg, method= "Cp", nbest=2)
+cp_values <- cp$Cp
+cp
+```
+
+Since P is 4, it would appear that the best model is the one with all variables except blocks - it has a Mallows CP value of 3.5, which is close to p. We'll put these values into a diagnostic dataframe and add in a few other measures of best subset.
+
+```{r}
+diag_df <- data.frame("Combinations" = c("DRB","BLK","STL,DRB","BLK,DRB","STL,PF,DRB","STL,BLK,DRB","STL,BLK,DRB,PF"))
+diag_df2 <- data.frame("Combinations" = c("DRB","BLK","STL,DRB","BLK,DRB","STL,PF,DRB","STL,BLK,DRB","STL,BLK,DRB,PF"))
+```
+
+We can also try the adjusted R2 method.
+
+```{r}
+r2adj <- leaps(cbind(df$STL, df$BLK, df$PF, df$DRB), names=c("steals","blocks","fouls","d rebounds"), df$DRtg, method= "adjr2", nbest=2)
+r2adj_values <- r2adj$adjr2
+```
+
+And we'll do the same with the regular R^2.
+
+```{r}
+r2 <- leaps(cbind(df$STL, df$BLK, df$PF, df$DRB), names=c("steals","blocks","fouls","d rebounds"), df$DRtg, method= "r2", nbest=2)
+r2_values <- r2$r2
+```
+
+Another set of diagnostics we can use are AIC and AICc.
+
+Model combinations copied from the Mallows CP test (leaps) above.
+
+```{r}
+AIC_values <- c(extractAIC(lm(data=df, DRtg ~ DRB))[2],
+extractAIC(lm(data=df, DRtg ~ BLK))[2],
+extractAIC(lm(data=df, DRtg ~ STL + DRB))[2],
+extractAIC(lm(data=df, DRtg ~ BLK + DRB))[2],
+extractAIC(lm(data=df, DRtg ~ STL + PF + DRB))[2],
+extractAIC(lm(data=df, DRtg ~ STL + BLK + DRB))[2],
+extractAIC(lm(data=df, DRtg ~ STL + BLK + DRB + PF))[2])
+```
+
+Now we'll do the same for AICc.
+
+```{r}
+AICc_values <- c(AICc(lm(data=df, DRtg ~ DRB)),
+AICc(lm(data=df, DRtg ~ BLK)),
+AICc(lm(data=df, DRtg ~ STL + DRB)),
+AICc(lm(data=df, DRtg ~ BLK + DRB)),
+AICc(lm(data=df, DRtg ~ STL + PF + DRB)),
+AICc(lm(data=df, DRtg ~ STL + BLK + DRB)),
+AICc(lm(data=df, DRtg ~ STL + BLK + DRB + PF)))
+```
+
+We'll add the values into the diagnostic dataframe, and take a look at them.
+
+```{r}
+diag_df$R2 <- r2_values
+diag_df$R2Adj <- r2adj_values
+
+diag_df2$MCP <- cp_values
+diag_df2$AIC <- AIC_values
+diag_df2$AICc <- AICc_values
+```
+
+```{r}
+diag_df
+```
+
+```{r}
+diag_df2
+```
+
+So according to all of the measures, we should remove Blocks from the regression (and it had a significantly high P-value anyway).
+
+We'll try removing Blocks from the regression and see if it has an impact. 
+
+```{r}
+reg2 <- lm(data=df, DRtg ~ STL + PF + DRB)
+summary(reg2)
+```
+
+By removing Blocks from the regression, we've actually increased the R^2 by 1%, decreased the residual standard error, and increased the F statistic / decreased the p statistic. As a result, the coefficient for all three remaining predicting variables have increased marginally. Removing Blocks from the regression would appear to be the correct path of action.
+
+VIFs look good too.
+
+```{r}
+vif(reg2)
+```
+
+Like before, we'll plot the standardized residuals in a 4(3 in our case) in 1 plot and then versus each of the individual predictors.
+
+```{r}
+res.stand2 <- rstandard(reg2)
+```
+
+```{r}
+par(mfrow=c(2,2))
+hist(res.stand2, main="Standardized Residuals Histogram", xlab="Residuals", xlim=c(-3,3))
+qqnorm(res.stand2)
+plot(reg2$fitted.values, res.stand2, main="Standardized Residuals Scatterplot", xlab="Fitted Values", ylab="Residuals", cex=.5, ylim=c(-3,3))  + abline(a=0, b=0)
+```
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(df$DRB, res.stand2, main="Standardized Residuals vs. Defensive Rebounds", xlab="Defensive Rebounds", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+
+plot(df$STL, res.stand2, main="Standardized Residuals vs. Steals", xlab="Steals", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+
+plot(df$PF, res.stand2, main="Standardized Residuals vs. Personal Fouls", xlab="Personal Fouls", ylab="Residuals", cex=.5, ylim=c(-3,3)) + abline(a=0,b=0)
+```
+
+Final diagnostics:
+
+```{r}
+teams <- df$Team
+leverage_values <- hatvalues(reg2)
+cooks_distances <- cooks.distance(reg2)
+diagnostics <- data.frame(teams, res.stand, leverage_values, cooks_distances)
+
+#Define the max leverage value: 2.5 * (number of predicting variables + 1 / n) = .4166
+
+arranged <- arrange(diagnostics, desc(res.stand))
+arranged
+```
+
+Aaaaaaand everything looks good. I think we're done here and have found the right model.
+
+After evaluating which subset of our variables would create the model with the best balance between parsimony and fit, we chose the 3 variable model that included steals, personal fouls, and defensive rebounds. An important insight from choosing this model is that blocks have no significant association with a better defensive rating. Although it may not be a surprise to some, often great defensive players (or at least centers) are lauded for their blocking ability, in addition to the excitement of having a great block on the week’s top 10 plays. Of the variables in the regression, the one with the most significant association with a lower points allowed per 100 possessions was steals. This may suggest that coaches should focus on teaching players how to steal, or it could be a default quality of great defenses in general. As better video analysis and Internet of Things technology proliferate, it’s exciting to imagine a regression that takes other factors into account like player speed, spacing, and contested shots.
+
